@@ -27,7 +27,7 @@ colnames(df_samples) %<>% tolower()
 current <- list.files("data/counts")
 (current <- current[!grepl(".Rda|RData",current)])
 (missing_data <- df_samples$sample.id[!(df_samples$sample.id %in% current)])
-
+df_samples %>% kable %>% kable_styling()
 #======1.1.2 record data quality before removing low quanlity cells =========================
 # `cite-seq` == "F"
 message("read metrics_summary")

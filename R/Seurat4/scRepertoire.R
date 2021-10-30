@@ -46,21 +46,25 @@ saveRDS(combined, "output/TCR.rds")
 
 #======1.2 load  Seurat =========================
 object = readRDS("data/OSU_SCT_20210821.rds")
-object$barcode = colnames(object)
-object <- combineExpression(combined, object, cloneCall="gene")
+object$barcode = gsub(".*-","",colnames(object))
+object$barcode %<>% paste0(object$sample,"-",.)
+object %<>% RenameCells(new.names = object$barcode)
+
+object <- combineExpression(combined, object, cloneCall="gene+nt")
 object@meta.data[is.na(object$Frequency),"Frequency"] = 0
-saveRDS(object@meta.data,"output/20211022/meta_data.rds")
 
+saveRDS(object,"data/OSU_SCT_20210821.rds")
 
+saveRDS(object@meta.data,"output/20211029/meta_data.rds")
 
-meta_data = readRDS("output/20211022/meta_data.rds")
+meta_data = readRDS("output/20211029/meta_data.rds")
 combined <- split(meta_data,f = meta_data$treatment)
 
 jpeg(paste0(path,"clonalDiversity_treatment.jpeg"), units="in", width=10, height=7,res=600)
 clonalDiversity(combined, cloneCall = "gene", group = "treatment")
 dev.off()
 
-meta_data = readRDS("output/20211022/meta_data.rds")
+meta_data = readRDS("output/20211029/meta_data.rds")
 combined <- split(meta_data,f = meta_data$sample)
 
 
@@ -130,7 +134,7 @@ clonalHomeostasis(sub_combined, cloneCall = "gene")
 dev.off()
 
 jpeg(paste0(path,"clonalDiversity_1.jpeg"), units="in", width=10, height=7,res=600)
-clonalDiversity(combined, cloneCall = "gene", group = "sample")
+clonalDiversity(combined, cloneCall = "gene", group = "treatment")
 dev.off()
 
 

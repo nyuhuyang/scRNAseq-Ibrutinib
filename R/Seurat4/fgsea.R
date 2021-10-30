@@ -18,7 +18,7 @@ if(!dir.exists(path)) dir.create(path, recursive = T)
 
 xlsx_list <- list.files(path = "output/20211027",
                        pattern = "Ibrutinib vs Baseline.*xlsx",full.names = T)
-deg <- pbapply::pblapply(xlsx_list, function(xlsx){
+deg_total <- pbapply::pblapply(xlsx_list, function(xlsx){
     tmp <- readxl::read_excel(xlsx)
     tmp = tmp[order(tmp$avg_log2FC,decreasing = T), ]
     cell_type = sub(".*_","",xlsx) %>% sub("\\.xlsx","",.)
@@ -27,14 +27,106 @@ deg <- pbapply::pblapply(xlsx_list, function(xlsx){
 }) %>% bind_rows()
 
 
+deg_total$cluster %<>% factor(levels = c("B cells","MDSCs","monocytes","NK cells","CD8T","CD4T","Treg"))
+
+csv_list <- list.files(path = "output/20211029",
+                        pattern = "[0-9+]_FC0.1_.*csv",full.names = T)
+deg <- pbapply::pblapply(csv_list, function(csv){
+    tmp <- read.csv(csv,row.names = 1,stringsAsFactors = F)
+    tmp$gene = rownames(tmp)
+    tmp[order(tmp$avg_log2FC,decreasing = T), ]
+}) %>% bind_rows()
+
+deg$cell.type %<>% plyr::mapvalues(from = c("B-cells",
+                                            "MDSCs",
+                                            "Monocytes",
+                                            "NK cells",
+                                            "T-cells:CD4+",
+                                            "T-cells:CD8+",
+                                            "T-cells:regs"),
+                                   to = c("B cells",
+                                          "MDSCs",
+                                          "monocytes",
+                                          "NK cells",
+                                          "CD8T",
+                                          "CD4T",
+                                          "Treg"))
+
 # read pathway
 
 hallmark <- fgsea::gmtPathways("../seurat_resources/msigdb/h.all.v7.4.symbols.gmt")
 names(hallmark) = gsub("HALLMARK_","",names(hallmark))
 names(hallmark) = gsub("\\_"," ",names(hallmark))
 
+#=========
+res = as.data.frame(deg_total)
+(clusters = unique(as.character(res$cluster)))
+res = filter(res, p_val_adj < 0.01)
 
 
+#res1 = filter(res, p_val_adj < 0.05)
+# hallmark
+Fgsea_res <- FgseaDotPlot(stats=res, pathways=hallmark,Rowv = T,
+                 title = "enriched hallmark pathways after treatment",
+                 size = " -log10(padj)", 
+                 cols = c("#4575B4","#74ADD1","#ABD9E9","#E0F3F8","#FFFFBF",
+                          "#FEE090","#FDAE61","#F46D43","#D73027")[c(1,1:9,9)],
+                 plot.title = element_text(hjust = 1,size = 15),
+                 order.yaxis.by = c("MDSCs","pval"),
+                 axis.text.x = element_text(angle = 45, hjust = 1,size = 12),
+                 width = 6,do.return = T)
+colnames(Fgsea_res)[5] = "cell.type"
+openxlsx::write.xlsx(split(Fgsea_res,f = Fgsea_res$cell.type ), 
+                     file =  paste0(path,"hallmark_gsea.xlsx"),
+                     colNames = TRUE,row.names = F,borders = "surrounding",colWidths = c(NA, "auto", "auto"))
+
+res = as.data.frame(deg)
+(clusters = unique(as.character(res$cluster)))
+res = filter(res, p_val < 0.01)
+res$cluster = res$cell.type
+(responses = unique(as.character(res$response)))
+
+
+
+Fgsea_list <- pbapply::pblapply(responses,function(r) {
+    res_sub = res %>% filter(response %in% r)
+    FgseaDotPlot(stats=res_sub, pathways=hallmark,Rowv =F,
+                 title = paste("enriched post treatment in",r),
+                 size = " -log10(padj)", 
+                 plot.title = element_text(hjust = 1,size = 15),
+                 cols = c("#4575B4","#74ADD1","#ABD9E9","#E0F3F8","#FFFFBF",
+                          "#FEE090","#FDAE61","#F46D43","#D73027")[c(1,1:9,9)],
+                 order.yaxis.by = c("MDSCs","pval"),
+                 #order.yaxis = as.character(Fgsea_res1$pathway),
+                 axis.text.x = element_text(angle = 45, hjust = 1,size = 12),
+                 save.path = path, file.name = paste0("Dotplot_",r,"_",
+                                                      "_0.25_0.05"),
+                 width = 6,do.return = T)
+})
+
+common_pathway = intersect(intersect(Fgsea_list[[1]]$pathway, Fgsea_list[[2]]$pathway),
+          Fgsea_list[[3]]$pathway)
+
+Fgsea_list <- pbapply::pblapply(responses,function(r) {
+    res_sub = res %>% filter(response %in% r)
+    FgseaDotPlot(stats=res_sub, pathways=hallmark,Rowv =F,
+                 title = paste("enriched post treatment in",r),
+                 size = " -log10(padj)", 
+                 plot.title = element_text(hjust = 1,size = 15),
+                 cols = c("#4575B4","#74ADD1","#ABD9E9","#E0F3F8","#FFFFBF",
+                          "#FEE090","#FDAE61","#F46D43","#D73027")[c(1,1:9,9)],
+                 order.yaxis.by = c("MDSCs","pval"),
+                 order.yaxis = common_pathway,
+                 axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5,size = 12),
+                 save.path = path, file.name = paste0("Dotplot_",r,"_",
+                                                      "_0.25_0.05"),
+                 width = 6,do.return = T)
+})
+
+
+
+
+#======================================================
 hallmark <- gmtPathways("../seurat_resources/msigdb/h.all.v7.4.symbols.gmt")
 Biocarta <- gmtPathways("../seurat_resources/msigdb/c2.cp.biocarta.v7.4.symbols.gmt")
 kegg <- gmtPathways("../seurat_resources/msigdb/c2.cp.kegg.v7.4.symbols.gmt")
@@ -58,24 +150,6 @@ msigdb_list <- list("hallmark" = hallmark,
                     "GO Biological Process" = go_bp,
                     "GO Cellular Component" = go_cc,
                     "GO Molecular Function" = go_mf)
-
-#=========
-res = as.data.frame(deg)
-(clusters = unique(as.character(res$cluster)))
-res = filter(res, p_val_adj < 0.05)
-
-# hallmark
-Fgsea_res <- FgseaDotPlot(stats=res, pathways=hallmark,Rowv = T,
-                 title = "enriched hallmark pathways after treatment",
-                 size = " -log10(padj)", 
-                 plot.title = element_text(hjust = 1,size = 15),
-                 order.yaxis.by = c("MDSCs","pval"),
-                 axis.text.x = element_text(angle = 45, hjust = 1,size = 12),
-                 width = 6,do.return = T)
-colnames(Fgsea_res)[5] = "cell.type"
-openxlsx::write.xlsx(split(Fgsea_res,f = Fgsea_res$cell.type ), 
-                     file =  paste0(path,"hallmark_gsea.xlsx"),
-                     colNames = TRUE,row.names = F,borders = "surrounding",colWidths = c(NA, "auto", "auto"))
 
 # Biocarta
 Fgsea_res <- FgseaDotPlot(stats=res, pathways=msigdb_list[["Biocarta"]],Rowv = T,
