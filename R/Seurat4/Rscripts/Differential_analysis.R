@@ -22,36 +22,61 @@ if(!dir.exists(path))dir.create(path, recursive = T)
 #======1.2 load  Seurat =========================
 object = readRDS("data/OSU_SCT_20210821.rds")
 # Need 32GB
-#DefaultAssay(object) = "SCT"
-#Idents(object) = "Doublets"
-#object <- subset(object, idents = "Singlet")
+DefaultAssay(object) = "SCT"
+Idents(object) = "Doublets"
+object <- subset(object, idents = "Singlet")
 
-opts = data.frame(cell.types = c(rep("B-cells",3),
-                            rep("MDSCs",3),
-                            rep("Monocytes",3),
-                            rep("NK cells",3),
-                            rep("T-cells:CD4+",3),
-                            rep("T-cells:CD8+",3),
-                            rep("T-cells:regs",3)),
-                  response = c(rep(c("PD","PR","SD"),times = 7))
-)
-
-print(opt <- opts[args,])
-object %<>% subset(subset = cell.types %in% opt$cell.types
-                   & response %in% opt$response)
-Idents(object) = "treatment"
-system.time(markers <- FindMarkers_UMI(object, 
-                                       ident.1 = "Ibrutinib",
-                                       group.by = "treatment",
-                                       logfc.threshold = 0.1, 
-                                    only.pos = F,
-                                       latent.vars = "nFeature_SCT",
-                                       test.use = "MAST"))
-
-markers$cell.type = opt$cell.types
-markers$response = opt$response
-markers$cluster = "Ibrutinib vs Baseline"
-
-arg = args
-if(args < 10) arg = paste0("0", args)
-write.csv(markers,paste0(path,arg,"_FC0.1_",opt$cell.types,"_",opt$response,".csv"))
+step = c("combine","clinical_response")[1]
+if(step == "combine"){
+    opts = c("B-cells","MDSCs","Monocytes","NK cells",
+             "T-cells:CD4+","T-cells:CD8+","T-cells:regs")
+    
+    print(opt <- opts[args])
+    object %<>% subset(subset = cell.types %in% opt)
+    Idents(object) = "treatment"
+    system.time(markers <- FindMarkers_UMI(object, 
+                                           ident.1 = "Ibrutinib",
+                                           group.by = "treatment",
+                                           logfc.threshold = 0.1, 
+                                           only.pos = F,
+                                           latent.vars = "nFeature_SCT",
+                                           test.use = "MAST"))
+    
+    markers$cell.type = opt$cell.types
+    markers$cluster = "Ibrutinib vs Baseline"
+    
+    write.csv(markers,paste0(path,args,"_FC0.1_",opt,"_Ibrutinib vs Baseline.csv"))
+    
+}
+    
+if(step == "clinical_response"){
+    opts = data.frame(cell.types = c(rep("B-cells",3),
+                                     rep("MDSCs",3),
+                                     rep("Monocytes",3),
+                                     rep("NK cells",3),
+                                     rep("T-cells:CD4+",3),
+                                     rep("T-cells:CD8+",3),
+                                     rep("T-cells:regs",3)),
+                      response = c(rep(c("PD","PR","SD"),times = 7))
+    )
+    
+    print(opt <- opts[args,])
+    object %<>% subset(subset = cell.types %in% opt$cell.types
+                       & response %in% opt$response)
+    Idents(object) = "treatment"
+    system.time(markers <- FindMarkers_UMI(object, 
+                                           ident.1 = "Ibrutinib",
+                                           group.by = "treatment",
+                                           logfc.threshold = 0.1, 
+                                           only.pos = F,
+                                           latent.vars = "nFeature_SCT",
+                                           test.use = "MAST"))
+    
+    markers$cell.type = opt$cell.types
+    markers$response = opt$response
+    markers$cluster = "Ibrutinib vs Baseline"
+    
+    arg = args
+    if(args < 10) arg = paste0("0", args)
+    write.csv(markers,paste0(path,arg,"_FC0.1_",opt$cell.types,"_",opt$response,".csv"))
+}
