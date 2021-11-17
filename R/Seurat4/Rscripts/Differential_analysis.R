@@ -42,7 +42,7 @@ if(step == "combine"){
                                            latent.vars = "nFeature_SCT",
                                            test.use = "MAST"))
     
-    markers$cell.type = opt$cell.types
+    markers$cell.type = opt
     markers$cluster = "Ibrutinib vs Baseline"
     
     write.csv(markers,paste0(path,args,"_FC0.1_",opt,"_Ibrutinib vs Baseline.csv"))

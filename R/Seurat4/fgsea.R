@@ -26,31 +26,33 @@ deg_total <- pbapply::pblapply(xlsx_list, function(xlsx){
     tmp
 }) %>% bind_rows()
 
-
-deg_total$cluster %<>% factor(levels = c("B cells","MDSCs","monocytes","NK cells","CD8T","CD4T","Treg"))
-
-csv_list <- list.files(path = "output/20211029",
-                        pattern = "[0-9+]_FC0.1_.*csv",full.names = T)
-deg <- pbapply::pblapply(csv_list, function(csv){
-    tmp <- read.csv(csv,row.names = 1,stringsAsFactors = F)
-    tmp$gene = rownames(tmp)
-    tmp[order(tmp$avg_log2FC,decreasing = T), ]
+# ========or ======
+csv_list <- list.files(path = "output/20211102",
+                       pattern = "Ibrutinib vs Baseline.*csv",full.names = T)
+deg_total <- pbapply::pblapply(csv_list, function(csv){
+    tmp <- read.csv(csv,row.names = 1)
+    tmp$gene =rownames(tmp)
+    tmp = tmp[order(tmp$avg_log2FC,decreasing = T), ]
+    tmp
 }) %>% bind_rows()
 
-deg$cell.type %<>% plyr::mapvalues(from = c("B-cells",
-                                            "MDSCs",
-                                            "Monocytes",
-                                            "NK cells",
-                                            "T-cells:CD4+",
-                                            "T-cells:CD8+",
-                                            "T-cells:regs"),
-                                   to = c("B cells",
-                                          "MDSCs",
-                                          "monocytes",
-                                          "NK cells",
-                                          "CD8T",
-                                          "CD4T",
-                                          "Treg"))
+
+deg_total$cell.type %<>% plyr::mapvalues(from = c("B-cells",
+                                                  "MDSCs",
+                                                  "Monocytes",
+                                                  "NK cells",
+                                                  "T-cells:CD4+",
+                                                  "T-cells:CD8+",
+                                                  "T-cells:regs"),
+                                         to = c("B cells",
+                                                "MDSCs",
+                                                "monocytes",
+                                                "NK cells",
+                                                "CD8T",
+                                                "CD4T",
+                                                "Treg"))
+deg_total$cluster = deg_total$cell.type
+deg_total$cluster %<>% factor(levels = c("B cells","MDSCs","monocytes","NK cells","CD8T","CD4T","Treg"))
 
 # read pathway
 
@@ -72,7 +74,7 @@ Fgsea_res <- FgseaDotPlot(stats=res, pathways=hallmark,Rowv = T,
                  cols = c("#4575B4","#74ADD1","#ABD9E9","#E0F3F8","#FFFFBF",
                           "#FEE090","#FDAE61","#F46D43","#D73027")[c(1,1:9,9)],
                  plot.title = element_text(hjust = 1,size = 15),
-                 order.yaxis.by = c("MDSCs","pval"),
+                 order.yaxis.by = c("MDSCs","padj"),
                  axis.text.x = element_text(angle = 45, hjust = 1,size = 12),
                  width = 6,do.return = T)
 colnames(Fgsea_res)[5] = "cell.type"

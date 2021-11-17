@@ -40,3 +40,15 @@ object[["FTH1_lvl"]] = Idents(object)
 object$disease %<>% gsub("melanoma","Melanoma",.)
 meta_data = object@meta.data
 saveRDS(meta_data,"output/20211022/meta_data.rds")
+
+
+cell_number <- read.csv("~/Downloads/partition_Cell_counts_BB.csv")
+total_cell_number= rowSums(cell_number[,3:11])
+cell_number  = cell_number[,c("patient","treatment","MDSC")]
+cell_number$MDSC = cell_number$MDSC/total_cell_number*100
+cell_number %<>% pivot_longer(cols = "MDSC")
+cell_number %<>% filter(patient != c("patient_08","patient_09"))
+cell_number = cell_number[order(cell_number$treatment),]
+cell_number_list <- split(cell_number,f = cell_number$treatment)
+wilcox.test(x = cell_number_list[["baseline"]]$value,
+            y = cell_number_list[["ibrutinib"]]$value,paired = TRUE)
