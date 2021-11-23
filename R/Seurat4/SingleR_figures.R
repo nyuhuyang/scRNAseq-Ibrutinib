@@ -16,12 +16,17 @@ if(!dir.exists(path)) dir.create(path, recursive = T)
 # create singleR data frame
 ###############################
 pred = readRDS("output/OSU_SCT_20210821_singleR_pred.rds")
+pred1 = readRDS("output/OSU_SCT_20211117_singleR_pred.rds")
 object = readRDS("data/OSU_SCT_20210821.rds")
 
 singlerDF = data.frame("label.fine" = pred$pruned.labels,
-                       row.names = rownames(pred))
+                       "celltype.l3" = pred1$pruned.labels,
+                       row.names = rownames(pred1))
 table(is.na(singlerDF$label.fine))
+table(is.na(singlerDF$celltype.l3))
+
 singlerDF$label.fine[is.na(singlerDF$label.fine)]= "unknown"
+singlerDF$celltype.l3[is.na(singlerDF$celltype.l3)]= "unknown"
 
 ##############################
 # adjust cell label
@@ -38,6 +43,14 @@ singlerDF$cell.types %<>% gsub("DC|Macrophages|Macrophages M1","other Myeloid ce
 singlerDF$cell.types %<>% gsub("Eosinophils|Megakaryocytes","other Myeloid cells",.)
 singlerDF$cell.types %<>% gsub("Astrocytes|Adipocytes|Fibroblasts|mv Endothelial cells|Keratinocytes|Epithelial cells","Nonhematopoietic cells",.)
 
+# ==========================
+path = "../seurat_resources/azimuth/PBMC/"
+meta.data = read.csv(paste0(path,"GSE164378/GSE164378_sc.meta.data_5P.csv"),row.names =1)
+meta.data = meta.data[!duplicated(meta.data$celltype.l3),]
+singlerDF$celltype.l2 = plyr::mapvalues(singlerDF$celltype.l3,from  = meta.data$celltype.l3,
+                                        to = meta.data$celltype.l2)
+singlerDF$celltype.l1 = plyr::mapvalues(singlerDF$celltype.l3,from  = meta.data$celltype.l3,
+                                        to = meta.data$celltype.l1)
 ##############################
 # process color scheme
 ##############################
@@ -59,6 +72,8 @@ singlerDF$cell.types.colors %<>% plyr::mapvalues(from = c("B-cells","Erythrocyte
                                                         "#7570B3","#F2F2F2"))
 table(colnames(object) == rownames(singlerDF))
 object@meta.data %<>% cbind(singlerDF[,c("label.fine","cell.types", "cell.types.colors")])
+object@meta.data %<>% cbind(singlerDF[,c("celltype.l1","celltype.l2", "celltype.l3")])
+
 
 lapply(c(TSNEPlot.1,UMAPPlot.1), function(fun)
     fun(object = object, label = T, label.repel = T,group.by = "cell.types",
@@ -67,7 +82,7 @@ lapply(c(TSNEPlot.1,UMAPPlot.1), function(fun)
         do.print = T,do.return = F,
         title ="labeling by blue_encode and TCGA-BLCA RNA-seq"))
 
-saveRDS(object, file = "data/OSU_SCT_20210821.rds")
+saveRDS(object, file = "data/OSU_SCT_20211123.rds")
 
 
 # by barplot

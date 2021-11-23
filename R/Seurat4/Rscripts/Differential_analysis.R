@@ -26,7 +26,45 @@ DefaultAssay(object) = "SCT"
 Idents(object) = "Doublets"
 object <- subset(object, idents = "Singlet")
 
-step = c("combine","clinical_response")[1]
+step = c("SCT_snn_res.0.8","cell.types","combine","clinical_response")[1]
+
+if("SCT_snn_res.0.8"){
+    #opts = 0:75
+    print(arg <- as.integer(args))
+    Idents(object) = "SCT_snn_res.0.8"
+    system.time(markers <- FindMarkers_UMI(object, 
+                                           ident.1 = arg,
+                                           group.by = "SCT_snn_res.0.8",
+                                           logfc.threshold = 0.25, 
+                                           only.pos = T,
+                                           latent.vars = "nFeature_SCT",
+                                           test.use = "MAST"))
+    
+    markers$cluster = arg
+    if(args < 10) arg = paste0("0", args)
+    write.csv(markers,paste0(path,arg,"_FC0.25_cluster_",args,".csv"))
+    
+}
+
+if("cell.types"){
+    opts = sort(unique(object$cell.types)) #1:11
+    print(opt <- opts[args])
+    Idents(object) = "cell.types"
+    system.time(markers <- FindMarkers_UMI(object, 
+                                           ident.1 = opt,
+                                           group.by = "cell.types",
+                                           logfc.threshold = 0.25, 
+                                           only.pos = T,
+                                           latent.vars = "nFeature_SCT",
+                                           test.use = "MAST"))
+    
+    markers$cluster = opt
+    if(args < 10) arg = paste0("0", args)
+    opt %<>% gsub(":|\\/","_",.)
+    write.csv(markers,paste0(path,arg,"_FC0.25_cell.types_",opt,".csv"))
+    
+}
+
 if(step == "combine"){
     opts = c("B-cells","MDSCs","Monocytes","NK cells",
              "T-cells:CD4+","T-cells:CD8+","T-cells:regs")
