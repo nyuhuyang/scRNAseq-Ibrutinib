@@ -6,9 +6,10 @@
 # conda activate r4.0.3
 invisible(lapply(c("Seurat","dplyr","ggplot2","scater","magrittr","pbapply",
                    "cowplot"), function(x) {
-        suppressPackageStartupMessages(library(x,character.only = T))
-        }))
+                           suppressPackageStartupMessages(library(x,character.only = T))
+                   }))
 source("https://raw.githubusercontent.com/nyuhuyang/SeuratExtra/master/R/Seurat4_functions.R")
+
 path <- paste0("output/",gsub("-","",Sys.Date()),"/")
 if(!dir.exists(path)) dir.create(path, recursive = T)
 if(!dir.exists("data")) dir.create("data")

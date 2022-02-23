@@ -8,6 +8,7 @@ invisible(lapply(c("Seurat","dplyr","cowplot",
                            suppressPackageStartupMessages(library(x,character.only = T))
                    }))
 source("https://raw.githubusercontent.com/nyuhuyang/SeuratExtra/master/R/Seurat4_differential_expression.R")
+#conda activate r4.0.3
 # SLURM_ARRAY_TASK_ID
 slurm_arrayid <- Sys.getenv('SLURM_ARRAY_TASK_ID')
 if (length(slurm_arrayid)!=1)  stop("Exact one argument must be supplied!")
@@ -17,7 +18,6 @@ print(paste0("slurm_arrayid=",args))
 
 path <- paste0("output/",gsub("-","",Sys.Date()),"/")
 if(!dir.exists(path))dir.create(path, recursive = T)
-# Need 64GB
 # load files
 #======1.2 load  Seurat =========================
 object = readRDS("data/OSU_SCT_20210821.rds")
@@ -26,9 +26,10 @@ DefaultAssay(object) = "SCT"
 Idents(object) = "Doublets"
 object <- subset(object, idents = "Singlet")
 
-step = c("SCT_snn_res.0.8","cell.types","combine","clinical_response")[1]
+step = c("SCT_snn_res.0.8","cell.types","combine",
+         "clinical_response","Subcluster")[5]
 
-if("SCT_snn_res.0.8"){
+if(step == "SCT_snn_res.0.8"){
     #opts = 0:75
     print(arg <- as.integer(args))
     Idents(object) = "SCT_snn_res.0.8"
@@ -46,7 +47,7 @@ if("SCT_snn_res.0.8"){
     
 }
 
-if("cell.types"){
+if(step == "cell.types"){
     opts = sort(unique(object$cell.types)) #1:11
     print(opt <- opts[args])
     Idents(object) = "cell.types"
@@ -117,4 +118,28 @@ if(step == "clinical_response"){
     arg = args
     if(args < 10) arg = paste0("0", args)
     write.csv(markers,paste0(path,arg,"_FC0.1_",opt$cell.types,"_",opt$response,".csv"))
+}
+
+
+if(step == "Subcluster"){
+    # Need 64GB
+    opts = c("B-cells","HSC/progenitors","MDSCs+Monocytes",
+             "NK cells","T-cells:CD4+","T-cells:CD8+","T-cells:regs")
+    object$cell.types %<>% gsub("MDSCs|Monocytes","MDSCs+Monocytes",.)
+    print(opt <- opts[args])
+    object %<>% subset(subset = cell.types %in% opt)
+    Idents(object) = "FTH1_lvl"
+    system.time(markers <- FindMarkers_UMI(object, 
+                                           ident.1 = "FTH1 high",
+                                           group.by = "FTH1_lvl",
+                                           logfc.threshold = 0.1, 
+                                           only.pos = F,
+                                           latent.vars = "nFeature_SCT",
+                                           test.use = "MAST"))
+    
+    markers$cell.type = opt
+    markers$cluster = "Subcluster1 vs Subcluster2"
+    
+    write.csv(markers,paste0(path,args,"_FC0.1_",opt,"_Subcluster1 vs Subcluster2.csv"))
+    
 }

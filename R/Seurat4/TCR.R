@@ -12,6 +12,58 @@ source("https://raw.githubusercontent.com/nyuhuyang/SeuratExtra/master/R/Seurat4
 path <- paste0("output/",gsub("-","",Sys.Date()),"/")
 if(!dir.exists(path)) dir.create(path, recursive = T)
 
+#=========================== after scRepertoire ===================
+meta_data = readRDS("output/20211029/meta_data.rds")
+# common tcr
+common_tcr_list <- split(meta_data[,c("patient","CTaa")],f = meta_data$patient)
+patients = levels(meta_data$patient)
+common_tcr <- c()
+for(i in 1:(length(common_tcr_list)-1)){
+    for(k in (i+1):length(patients)){
+        new_common_tcr = intersect(common_tcr_list[[i]]$CTaa,
+                                   common_tcr_list[[k]]$CTaa)
+        print(paste( patients[i],"and",  patients[k], "share",length(new_common_tcr),"tcr"))
+        common_tcr = c(common_tcr, new_common_tcr)
+        
+    }
+}
+rm(common_tcr_list);GC()
+common_tcr = unique(common_tcr)
+common_tcr = common_tcr[!is.na(common_tcr)]
+# Persistent tcr
+
+persistent_tcr_list <- split(meta_data[,c("treatment","CTaa")],f = meta_data$treatment)
+timepoints = unique(meta_data$treatment)
+persistent_tcr = intersect(persistent_tcr_list[["Baseline"]]$CTaa,
+                           persistent_tcr_list[["Ibrutinib"]]$CTaa)
+rm(persistent_tcr_list);GC()
+persistent_tcr = unique(persistent_tcr);length(persistent_tcr)
+persistent_tcr = persistent_tcr[!is.na(persistent_tcr)]
+meta_data$persistent_tcr = meta_data$CTaa %in% persistent_tcr
+
+tcr_counter = as.data.frame(table(meta_data$CTaa))
+tcr_counter$Var1 %<>% as.character()
+meta_data$enriched_tcr = meta_data$CTaa %in% tcr_counter[tcr_counter$Freq > 1,"Var1"] & !is.na(meta_data$CTaa)
+meta_data$singlets_tcr = meta_data$CTaa %in% tcr_counter[tcr_counter$Freq == 1,"Var1"]  & !is.na(meta_data$CTaa)
+
+meta_data$tcr_clonetype = meta_data$CTaa
+meta_data$tcr_clonetype[meta_data$singlets_tcr] = "singlets"
+meta_data$tcr_clonetype[meta_data$enriched_tcr] = "enriched"
+meta_data$tcr_clonetype[meta_data$persistent_tcr] = "persistent"
+meta_data$tcr_clonetype[meta_data$common_tcr] = "common"
+meta_data$tcr_clonetype[meta_data$common_tcr & meta_data$persistent_tcr] = "persistent & common"
+meta_data$persistent_tcr = NULL;
+meta_data$enriched_tcr = NULL;
+meta_data$singlets_tcr = NULL;
+
+meta_data = meta_data[colnames(object),]
+meta_data$tcr_clonetype %<>% factor(levels = c("singlets","persistent","enriched","common","persistent & common"))
+saveRDS(meta_data,paste0(path,"meta_data.rds")) #20220207
+write.csv(meta_data[c("orig.ident","patient","timepoint","treatment","response","cell.types",
+                      "frequency","proportion","cdr3s_aa","tcr_clonetype")],file = paste0(path,"meta_data.csv"))
+
+
+
 
 ########################################################################
 #
@@ -41,7 +93,7 @@ for(i in 1:length(df_samples$sample.id)){
     tcr_folder = paste0("data/counts/",s)
     tcr  <- add_tcr_clonotype(tcr_folder)
     tcr$barcode %<>% paste0(s,"-",.)
-
+    
     sub_meta.data = meta.data[cells,]
     sub_meta.data %<>% left_join(tcr,by = "barcode")
     rownames(sub_meta.data) = sub_meta.data$barcode
@@ -68,39 +120,13 @@ for(i in 1:length(patients)){
     sub_meta.dat_list <- split(sub_meta.data,f = sub_meta.data$orig.ident)
     if(length(sub_meta.dat_list) >1) {
         shared_tcr = intersect(sub_meta.dat_list[[1]]$cdr3s_aa,
-                           sub_meta.dat_list[[2]]$cdr3s_aa)
+                               sub_meta.dat_list[[2]]$cdr3s_aa)
         shared_tcr = shared_tcr[!shared_tcr %in% "none"]
         sub_meta.data$shared_tcr = sub_meta.data$cdr3s_aa %in% shared_tcr
     } else sub_meta.data$shared_tcr = FALSE
     meta.data_list[[i]] = sub_meta.data
 }
 meta_data = bind_rows(meta.data_list)
-
-common_tcr <- c()
-for(i in 1:(length(patients)-1)){
-    for(k in (i+1):length(patients)){
-        new_common_tcr = intersect(common_tcr_list[[i]],
-                                   common_tcr_list[[k]])
-        print(paste( patients[i],"and",  patients[k], "share",length(new_common_tcr),"tcr"))
-        common_tcr = c(common_tcr, new_common_tcr)
-        
-    }
-}
-common_tcr = unique(common_tcr)
-common_tcr = common_tcr[!common_tcr %in% "none"]
-
-meta_data$common_tcr = meta_data$cdr3s_aa %in% common_tcr
-meta_data$unique_tcr = (!(meta_data$shared_tcr | meta_data$common_tcr)) & meta_data$cdr3s_aa != "none"
-meta_data$tcr_clonetype = meta_data$cdr3s_aa
-meta_data$tcr_clonetype[meta_data$unique_tcr] = "unique"
-meta_data$tcr_clonetype[meta_data$shared_tcr] = "shared"
-meta_data$tcr_clonetype[meta_data$common_tcr] = "common"
-
-meta_data = meta_data[colnames(object),]
-
-saveRDS(meta_data,paste0(path,"meta_data.rds"))
-write.csv(meta_data[c("orig.ident","patient","timepoint","treatment","response","cell.types",
-                      "frequency","proportion","cdr3s_aa","tcr_clonetype")],file = paste0(path,"meta_data.csv"))
 
 
 add_tcr_clonotype <- function(tcr_folder){

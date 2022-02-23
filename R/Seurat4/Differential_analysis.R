@@ -54,6 +54,33 @@ df_logFC %<>% tibble::rownames_to_column("cell.types")
 df_logFC %<>% pivot_longer(!cell.types, names_to = "change", values_to = "gene number")
 df_logFC = df_logFC[order(df_logFC$change),]
 
+#======================
+csv_list <- list.files(path = "output/20211123",
+                       pattern = "FC0.25_cell.types_.*csv",full.names = T)
+deg_total <- pbapply::pblapply(csv_list, function(csv){
+    tmp <- read.csv(csv,row.names = 1)
+    tmp$gene =rownames(tmp)
+    tmp = tmp[order(tmp$avg_log2FC,decreasing = T), ]
+    tmp
+}) %>% bind_rows()
+
+openxlsx::write.xlsx(deg_total, file = paste0(path,"DEGs_cell.types.xlsx"),
+                     colNames = TRUE,rowNames = FALSE, borders = "surrounding",colWidths = c(NA, "auto", "auto"))
+#======================
+csv_list <- list.files(path = "output/20211123",
+                       pattern = "_FC0.25_cluster_.*csv",full.names = T)
+deg_total <- pbapply::pblapply(csv_list, function(csv){
+    tmp <- read.csv(csv,row.names = 1)
+    tmp$gene =rownames(tmp)
+    tmp = tmp[order(tmp$avg_log2FC,decreasing = T), ]
+    tmp
+}) %>% bind_rows()
+
+openxlsx::write.xlsx(deg_total, file = paste0(path,"DEGs_Cluster_resolution.0.8.xlsx"),
+                     colNames = TRUE,rowNames = FALSE, borders = "surrounding",colWidths = c(NA, "auto", "auto"))
+
+
+
 jpeg(paste0(path,"gene_number_change.jpeg"), units="in", width=10, height=7,res=600)
 ggbarplot(df_logFC, x="cell.types", y= "gene number",fill="change",
           palette = c("#A6CEE3","#B15928"),lab.size = 20)+
