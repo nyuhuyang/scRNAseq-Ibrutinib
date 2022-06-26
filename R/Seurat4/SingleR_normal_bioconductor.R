@@ -36,4 +36,4 @@ system.time(trained <- trainSingleR(ref = PBMC[common,],
                                     labels=PBMC$celltype.l3))
 system.time(pred <- classifySingleR(sce[common,], trained))
 # elapsed 4872.846 sec
-saveRDS(object = pred, file = "output/OSU_SCT_20211117_singleR_pred.rds")
+saveRDS(object = pred, file = "output/OSU_20220323_singleR_pred.rds")

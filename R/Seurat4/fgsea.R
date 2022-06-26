@@ -53,6 +53,15 @@ deg_total$cell.type %<>% plyr::mapvalues(from = c("B-cells",
                                                 "Treg"))
 deg_total$cluster = deg_total$cell.type
 deg_total$cluster %<>% factor(levels = c("B cells","MDSCs","monocytes","NK cells","CD8T","CD4T","Treg"))
+#=====================
+csv_list <- list.files(path = "output/20220223",
+                       pattern = "_FC0.1_.*csv",full.names = T)
+deg_total <- pbapply::pblapply(csv_list, function(csv){
+    tmp <- read.csv(csv,row.names = 1)
+    tmp$gene =rownames(tmp)
+    tmp = tmp[order(tmp$avg_log2FC,decreasing = T), ]
+    tmp
+}) %>% bind_rows()
 
 # read pathway
 
@@ -62,25 +71,27 @@ names(hallmark) = gsub("\\_"," ",names(hallmark))
 
 #=========
 res = as.data.frame(deg_total)
+res$cluster = res$cell.type
 (clusters = unique(as.character(res$cluster)))
+
 res = filter(res, p_val_adj < 0.01)
 
 
 #res1 = filter(res, p_val_adj < 0.05)
 # hallmark
-Fgsea_res <- FgseaDotPlot(stats=res, pathways=hallmark,Rowv = T,
-                 title = "enriched hallmark pathways after treatment",
+Fgsea_res <- FgseaDotPlot(stats=res, pathways=hallmark,Rowv =F,
+                 title = "enriched hallmark pathways in Subcluster 1",
                  size = " -log10(padj)", 
                  cols = c("#4575B4","#74ADD1","#ABD9E9","#E0F3F8","#FFFFBF",
                           "#FEE090","#FDAE61","#F46D43","#D73027")[c(1,1:9,9)],
                  plot.title = element_text(hjust = 1,size = 15),
-                 order.yaxis.by = c("MDSCs","padj"),
+                 order.yaxis.by = c("MDSCs+Monocytes","padj"),
                  axis.text.x = element_text(angle = 45, hjust = 1,size = 12),
                  width = 6,do.return = T)
 colnames(Fgsea_res)[5] = "cell.type"
 openxlsx::write.xlsx(split(Fgsea_res,f = Fgsea_res$cell.type ), 
                      file =  paste0(path,"hallmark_gsea.xlsx"),
-                     colNames = TRUE,row.names = F,borders = "surrounding",colWidths = c(NA, "auto", "auto"))
+                     colNames = TRUE,row.names = F,borders = "surrounding")
 
 res = as.data.frame(deg)
 (clusters = unique(as.character(res$cluster)))

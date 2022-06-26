@@ -78,8 +78,33 @@ deg_total <- pbapply::pblapply(csv_list, function(csv){
 
 openxlsx::write.xlsx(deg_total, file = paste0(path,"DEGs_Cluster_resolution.0.8.xlsx"),
                      colNames = TRUE,rowNames = FALSE, borders = "surrounding",colWidths = c(NA, "auto", "auto"))
+#======================
+csv_list <- list.files(path = "output/20220223",
+                       pattern = "_FC0.1_.*csv",full.names = T)
+deg_cluster <- pbapply::pblapply(csv_list, function(csv){
+    tmp <- read.csv(csv,row.names = 1)
+    tmp$gene =rownames(tmp)
+    tmp = tmp[order(tmp$avg_log2FC,decreasing = T), ]
+    tmp
+}) %>% bind_rows()
 
+openxlsx::write.xlsx(deg_cluster, file = paste0(path,"DEGs_SubCluster.xlsx"),
+                     colNames = TRUE,rowNames = FALSE, borders = "surrounding")
 
+deg_cluster %<>% split(f = deg_cluster$cell.type)
+names(deg_cluster)
+for(cell in names(deg_cluster)){
+    g <- VolcanoPlots(deg_cluster[[cell]], cut_off_value = 0.05, cut_off = "p_val_adj",
+                      cut_off_logFC = 0.2,top = 15,
+                      cols = c("#74ADD1","#d2dae2","#F46D43"),alpha=0.7, size=4,font.size=5,
+                      legend.size = 12,force = 7,min.segment.length = 0)+ theme(legend.position="bottom")
+    g = g + ggtitle(cell)
+    g = g + TitleCenter()#+theme_bw()
+    
+    jpeg(paste0(path,"VolcanoPlots_",cell,".jpeg"),units="in", width=10, height=10,res=600)
+    print(g)
+    dev.off()
+}
 
 jpeg(paste0(path,"gene_number_change.jpeg"), units="in", width=10, height=7,res=600)
 ggbarplot(df_logFC, x="cell.types", y= "gene number",fill="change",
